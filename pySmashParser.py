@@ -3,24 +3,43 @@ import convenience
 
 smash = pysmash.SmashGG()
 	
-def parsePlayers(tournamentName):
-	event = 'melee-singles'
-	try:
-		print(tournamentName)
-		playersGG = smash.tournament_show_players(tournamentName, event)
-	except:
+def parsePlayers(tournamentName, type):
+	if type == 'melee':
+		events = ['melee-singles', 'super-smash-bros-melee', 'super-smash-bros-melee-singles']
+		playersGG = []
+	elif type == 'wiiu':
+		events = ['wii-u-singles', 'super-smash-bros-for-wii-u-singles', 'smash-4-singles']
+		playersGG = []
+	elif type == 'pm':
+		events = ['pm-singles', 'project-m-singles', 'project-m-3-6-singles', 'project-m-3-02-singles']
+		playersGG = []
+	elif type == '64':
+		events = ['64-singles', 'smash-64-singles', '']
+		playersGG = []
+	for event in events:
 		try:
-			event = 'super-smash-bros-melee-singles'
+			print(tournamentName)
 			playersGG = smash.tournament_show_players(tournamentName, event)
+			break
 		except:
-			print('invalid tournament name')
-			raise Exception('!')
-	sets = smash.tournament_show_sets(tournamentName, event)
+			continue
+	sets = []
+	for event in events:
+		try:
+			sets = smash.tournament_show_sets(tournamentName, event)
+		except:
+			continue
 	for player in playersGG:
-		player['Games won'] = 0
-		player['Games lost'] = 0
-		player['lost to'] = []
-		player['won against'] = []
+		try:
+			player['Games won'] = 0
+			player['Games lost'] = 0
+			player['lost to'] = []
+			player['won against'] = []
+			if player['final_placement'] == 1:
+				print('winner found')
+				playersGG.append('winner')
+		except:
+			continue
 	
 	for set in sets:
 		try:
@@ -28,15 +47,20 @@ def parsePlayers(tournamentName):
 			player2 = getPlayerFromListById(int(set['entrant_2_id']), playersGG)
 			winner = getPlayerFromListById(int(set['winner_id']), playersGG)
 			loser = getPlayerFromListById(int(set['loser_id']), playersGG)
-			loser['lost to'].append(winner['tag'])
-			winner['won against'].append(loser['tag'])
+			if set.get('entrant_1_score') > set.get('entrant_2_score'):
+				loserScore = set.get('entrant_2_score')
+				winnerScore = set.get('entrant_1_score')
+			else:
+				loserScore = set.get('entrant_1_score')
+				winnerScore = set.get('entrant_2_score')
+			loser['lost to'].append(set.get('medium_round_text') + ": " + winner['tag'] + " " + str(loserScore) + "-" + str(winnerScore))
+			winner['won against'].append(set.get('medium_round_text') + ": " + loser['tag'] + " " + str(winnerScore) + "-" + str(loserScore))
 			player1['Games won'] += set.get('entrant_1_score')
 			player2['Games lost'] += set.get('entrant_1_score')
 			player2['Games won'] += set.get('entrant_2_score')
 			player1['Games lost'] += set.get('entrant_2_score')
 		except:
 			continue
-		
 	return playersGG
 	
 def getPlayerFromListById(player_id, my_list):
@@ -60,7 +84,14 @@ def getTournament(text):
 	
 def getCommand(text):
 	words = convenience.mysplit(text)
-	i = words.index('!smashbot')
+	if '!smashbot' in text.lower():
+		i = words.index('!smashbot')
+	if '!wiiu' in text.lower():
+		i = words.index('!wiiu')
+	if '!pm' in text.lower():
+		i = words.index('!pm')
+	if '!64' in text.lower():
+		i = words.index('!64')
 	words = words[(i+1):]
 	text = ' '.join(words)
 	tournament = getTournament(text)

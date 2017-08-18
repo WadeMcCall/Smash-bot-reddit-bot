@@ -5,15 +5,15 @@ import time
 import pySmashParser
 
 def main():
-	reddit = praw.Reddit(user_agent='SmashGGBot v0.1(by /u/gronkey)',
-					client_id='WkzX4VQyu6n3rg',
-					client_secret='x1VpqB-VesMlg2kaasgjdfSIcAs',
-					username='SmashGGBot',
+	reddit = praw.Reddit(user_agent='SmashGGBot v0.2(by /u/gronkey)',
+					client_id='m12jp9GObEKxmw',
+					client_secret='QnTR0Gp7thjTOIWMuTcFMznPAJU',
+					username='botTestThrowaway1234',
 					password=')OKMnji9')
 					
 	print(reddit.user.me())
 	
-	subreddit = reddit.subreddit('test+ssbm+smashbros')
+	subreddit = reddit.subreddit('test')
 	subredditComments = subreddit.stream.comments()
 	
 	tournaments = []
@@ -22,11 +22,13 @@ def main():
 	message = "bot started: {0} \nOnly comments after this time will be affected. \n\n".format(botStartDate)
 	print(message)
 	
+	#**** start copy-paste for update ****#
+	
 	for comment in subredditComments:
 		if convenience.get_date(comment) > botStartDate: 	# filters out comments from before the bot is live
 			text = comment.body.lower()
 			commandFound = 0
-			if ('!smashbot' in text) or ('!melee' in text): 				
+			if '!smashbot' in text: 				
 				eventType = 'melee'
 				commandFound = 1
 			elif '!wiiu' in text:
