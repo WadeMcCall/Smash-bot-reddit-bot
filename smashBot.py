@@ -3,6 +3,7 @@ import convenience
 import datetime
 import time
 import pySmashParser
+import pickle
 
 def main():
 	reddit = praw.Reddit(user_agent='SmashGGBot v0.1(by /u/gronkey)',
@@ -16,7 +17,10 @@ def main():
 	subreddit = reddit.subreddit('test+ssbm+smashbros')
 	subredditComments = subreddit.stream.comments()
 	
-	tournaments = []
+	try:
+		tournaments = pickle.load(open("tournaments.p","rb"))				#load previously saved tournament, if any.
+	except EOFError:
+		tournaments = []
 	
 	botStartDate = convenience.now()
 	message = "bot started: {0} \nOnly comments after this time will be affected. \n\n".format(botStartDate)
@@ -68,6 +72,7 @@ def main():
 							currentTournament = pySmashParser.parsePlayers(tournamentName, eventType)
 							tournaments.append({"name": tournamentName + eventType, "tournament": currentTournament})
 							convenience.safeprint ("added to list: {0}".format(tournamentName))
+							pickle.dump( tournaments, open( "tournaments.p", "wb" ) )
 						except:
 							message = "{0} not found!".format(command[0])
 							print(message)
@@ -78,8 +83,8 @@ def main():
 					ReplyToComment(comment, message)
 				except:
 					convenience.safeprint(playerName)
-					message = "player not found!"
-					print(message)
+					message = "player/tournament not found! make sure to remove spaces from player names and replace special characters with spaces in tournament names. (don t park on the grass) themoon\n\n ------  \n *I am a bot! my info comes from [smash.gg](https://smash.gg/) (unofficial) for bug reporting or suggestions, please message /u/gronkey*"
+					ReplyToComment(comment, message)
 					
 def ReplyToComment(comment, message):
 	try:

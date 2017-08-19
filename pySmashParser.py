@@ -86,6 +86,8 @@ def getCommand(text):
 	words = convenience.mysplit(text)
 	if '!smashbot' in text.lower():
 		i = words.index('!smashbot')
+	if '!melee' in text.lower():
+		i = words.index('!melee')
 	if '!wiiu' in text.lower():
 		i = words.index('!wiiu')
 	if '!pm' in text.lower():
