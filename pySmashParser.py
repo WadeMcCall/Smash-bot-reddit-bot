@@ -1,24 +1,27 @@
 import pysmash
 import convenience
+import elo
 
 smash = pysmash.SmashGG()
 	
-def parsePlayers(tournamentName, type):
+def parsePlayers(tournamentName, type, stats):
+	ret = []
+	winner = 0
 	if type == 'melee':
-		events = ['melee-singles', 'super-smash-bros-melee', 'super-smash-bros-melee-singles']
+		events = ['melee-singles', 'super-smash-bros-melee', 'super-smash-bros-melee-singles', 'melee-singles-1']
 		playersGG = []
 	elif type == 'wiiu':
-		events = ['wii-u-singles', 'super-smash-bros-for-wii-u-singles', 'smash-4-singles']
+		events = ['wii-u-singles', 'super-smash-bros-for-wii-u-singles', 'smash-4-singles', 'super-smash-bros-for-wii-u']
 		playersGG = []
 	elif type == 'pm':
 		events = ['pm-singles', 'project-m-singles', 'project-m-3-6-singles', 'project-m-3-02-singles']
 		playersGG = []
 	elif type == '64':
-		events = ['64-singles', 'smash-64-singles', '']
+		events = ['64-singles', 'smash-64-singles']
 		playersGG = []
 	for event in events:
 		try:
-			print(tournamentName)
+			print(event)
 			playersGG = smash.tournament_show_players(tournamentName, event)
 			break
 		except:
@@ -37,6 +40,7 @@ def parsePlayers(tournamentName, type):
 			player['won against'] = []
 			if player['final_placement'] == 1:
 				print('winner found')
+				winner = 1
 				playersGG.append('winner')
 		except:
 			continue
@@ -61,16 +65,132 @@ def parsePlayers(tournamentName, type):
 			player1['Games lost'] += set.get('entrant_2_score')
 		except:
 			continue
-	return playersGG
+	if(winner):
+		stats = addStatsFromTournament(stats, sets, playersGG, tournamentName, type)
+	ret.append(playersGG)
+	ret.append(stats)
+	return ret
 	
 def getPlayerFromListById(player_id, my_list):
-	return next((item for item in my_list if item['entrant_id'] == player_id), None)
+	return next((item for item in my_list if str(item['entrant_id']) == str(player_id)), None)
 	
 def getPlayerFromListByTag(tag, my_list):
 	tag = tag.lower()
 	tag = tag.replace(" ", "")
-	print(tag)
 	return next((item for item in my_list if (item['tag'].lower()).replace(" ", "") == tag), None)
+	
+
+		
+def addStatsForExistingPlayer(stats, player, tournamentSize, tournamentName, type):
+	playerStats = findDictFromListbyId(stats, player['tag'] + type)
+	playerStats = playerStats.get('stats')
+	if (player['final_placement'] == 1):
+		playerStats['tournamentWins'] += 1
+		playerStats['tournamentTop8s'] += 1
+		playerStats['tournamentsWon'].append(tournamentName.replace("-", " ").title())
+		playerStats['tournamentsTop8ed'].append(tournamentName.replace("-", " ").title())
+		if(tournamentSize >= 300):
+			playerStats['tournamentWinsOver300'] += 1
+			playerStats['tournamentTop8sOver300'] += 1
+	elif (player['final_placement'] == 7) or (player['final_placement'] == 5) or (player['final_placement'] == 4) or (player['final_placement'] == 3) or (player['final_placement'] == 2):
+		playerStats['tournamentTop8s'] += 1
+		playerStats['tournamentsTop8ed'].append(tournamentName.replace("-", " ").title())
+		if(tournamentSize >= 300):
+			playerStats['tournamentTop8sOver300'] += 1
+
+def addStatsFromTournament(stats, sets, players, tournamentName, type):
+	tournamentSize = len(players)
+	print("addStatsFromTournament")
+	for playert in players:
+		try:
+			player = playert.copy()
+		except:
+			continue
+		try:
+			playerDict = findDictFromListbyId(stats, player['tag'] + type)
+			if(playerDict == None):
+				raise Exception("!")
+			p = playerDict.get('stats')
+			if(p == None):
+				raise Exception("!")
+			p['Games won'] += player['Games won']
+			p['Games lost'] += player['Games lost']
+			addStatsForExistingPlayer(stats, player, tournamentSize, tournamentName, type)
+		except:
+			pStats = {}
+			pStats['tag'] = player['tag']
+			pStats['Games won'] = player['Games won']
+			pStats['Games lost'] = player['Games lost']
+			pStats['elo'] = 1500
+			pStats['tournamentWins'] = 0
+			pStats['tournamentTop8s'] = 0
+			pStats['tournamentWinsOver300'] = 0
+			pStats['tournamentTop8sOver300'] = 0
+			pStats['tournamentsWon'] = []
+			pStats['tournamentsTop8ed'] = []
+			stats.append({"name": player['tag'], 'stats': pStats, "id": player['tag'] + type, "type": type})
+			addStatsForExistingPlayer(stats, player, tournamentSize, tournamentName, type)
+	for set in sets:
+		for playert in players:
+			try:
+				player = playert.copy()
+			except:
+				continue
+			if (str(player['entrant_id']) == str(set['entrant_1_id'])):
+				try:
+					opp = getPlayerFromListById(set['entrant_2_id'], players)
+					if opp == None:
+						continue
+				except:
+					continue
+				oppStats = findDictFromListbyId(stats, opp['tag'] + type)
+				oppStats = oppStats.get('stats')
+				oppElo = oppStats['elo']
+				playerStats = findDictFromListbyId(stats, player['tag'] + type)
+				playerStats = playerStats.get('stats')
+				playerStats['elo'] = updateElo(playerStats, set, 1, oppElo)
+			elif (str(player['entrant_id']) == str(set['entrant_2_id'])):
+				try:
+					opp = getPlayerFromListById(set['entrant_1_id'], players)
+					if opp == None:
+						continue
+				except:
+					continue
+				oppStats = findDictFromListbyId(stats, opp['tag'] + type)
+				oppStats = oppStats.get('stats')
+				oppElo = oppStats['elo']
+				playerStats = findDictFromListbyId(stats, player['tag'] + type)
+				playerStats = playerStats.get('stats')
+				playerStats['elo'] = updateElo(playerStats, set, 2, oppElo)
+	return stats
+
+def updateElo(player, set, entrantNumber, oppElo):
+	oppId = str()
+	entrantId = str()
+	score = 0
+	if entrantNumber == 1:
+		score = set['entrant_1_score']
+		oppScore = set['entrant_2_score']
+		entrantId = 'entrant_1_id'
+		oppId = 'entrant_2_id'
+	else:
+		score = set['entrant_2_score']
+		oppScore = set['entrant_1_score']
+		entrantId = 'entrant_2_id'
+		oppId = 'entrant_1_id'
+	exp = elo.expected(player['elo'], oppElo)
+	if (score == None) or (oppScore == None) or (score == -1) or (oppScore == -1):
+		return player['elo']
+	actual = 0
+	if(score > oppScore):
+		actual = 1
+	return elo.elo(player['elo'], exp, actual, 96)
+	
+def findDictFromList(tournaments, tournamentName):
+	return next((item for item in tournaments if item["name"] == tournamentName), None)
+
+def findDictFromListbyId(tournaments, tournamentName):
+	return next((item for item in tournaments if item["id"] == tournamentName), None)
 	
 	
 def getTournament(text):
@@ -81,6 +201,17 @@ def getTournament(text):
 	except:
 		tournamentName = None
 	return tournamentName
+	
+def getStatsCommand(text):
+	words = convenience.mysplit(text)
+	i = words.index('!stats')
+	words = words[(i+1):]
+	command = [str("")] *2
+	command[0] = words[0]
+	command[1] = words[1]
+	if(command[0] == None) or (command[1] == None):
+		raise Exception("!")
+	return command
 	
 def getCommand(text):
 	words = convenience.mysplit(text)
@@ -101,6 +232,18 @@ def getCommand(text):
 	try:
 		text = text[text.index(tournament)+ len(tournament) + 1:]
 		tournament = tournament.lower()
+		tournament = tournament.replace(".", " ")
+		tournament = tournament.replace("'", " ")
+		tournament = tournament.replace("/", " ")
+		tournament = tournament.replace("(", "")
+		tournament = tournament.replace(",", "")
+		tournament = tournament.replace("|", "")
+		tournament = tournament.replace(":", "")
+		tournament = tournament.replace("-", "")
+		tournament = tournament.replace("#", "")
+		tournament = tournament.replace("!", "")
+		tournament = tournament.replace(";", "")
+		tournament = tournament.replace("+", "")
 		tournament = tournament.replace(" ", "-")
 		words = convenience.mysplit(text)
 		command[0] = tournament
